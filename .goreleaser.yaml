@@ -14,3 +14,10 @@ builds:
       - windows
     goarch:
       - amd64
+    goamd64:
+      - v2
+      - v3
+
+upx:
+  - enabled: true
+    compress: best
