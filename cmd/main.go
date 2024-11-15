@@ -2,49 +2,77 @@ package main
 
 import (
 	"context"
+	"errors"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"chier/config"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/httplog"
+	"github.com/go-chi/httplog/v2"
 
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
-
-	"chier/config"
+	_ "chier/docs"
 	handler "chier/internal/http"
+
+	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
 
-func main() {
-	config, err := config.LoadAppConfig(".")
-	if err != nil {
-		log.Fatal().Err(err).Msg("unable to load configurations")
-	}
+// @title Swagger Example API
+// @version 1.0
+// @description This is a sample chi server.
+// @termsOfService http://swagger.io/terms/
 
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-	httplog.Configure(httplog.Options{Concise: true, TimeFieldFormat: time.DateTime})
+// @contact.name API Support
+// @contact.url http://www.swagger.io/support
+// @contact.email support@swagger.io
+
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @Host localhost:4343
+// @BasePath /v1
+
+var logger httplog.Logger
+
+func main() {
+	logger := httplog.NewLogger("Chi", httplog.Options{
+		Concise:          true,
+		RequestHeaders:   true,
+		TimeFieldFormat:  time.RFC3339,
+		MessageFieldName: "message",
+	})
+	cfg, err := config.LoadAppConfig(".")
+	if err != nil {
+		logger.Error("unable to load configurations", ErrAttr(err))
+	}
 
 	router := chi.NewRouter()
 
-	router.Use(httplog.RequestLogger(log.Logger))
+	router.Use(httplog.RequestLogger(logger))
 	router.Use(middleware.Timeout(60 * time.Second))
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RealIP)
 	router.Use(middleware.Recoverer)
+	router.Use(middleware.Heartbeat("/healthz"))
+
+	router.Get("/swagger/*", httpSwagger.Handler(
+		httpSwagger.URL("/swagger/doc.json"),
+	))
 
 	handler.NewPingHandler(router)
 
-	server := newServer(config.ServeAddress, router)
+	server := newServer(cfg.ServeAddress, router)
 
-	log.Info().Msg("Starting server...")
+	logger.Info("Server started....", cfg.ServeAddress)
 
 	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatal().Err(err).Msg("failed to start server")
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("failed to start server", ErrAttr(err))
 		}
 	}()
 
@@ -59,8 +87,10 @@ func waitForShutdown(server *http.Server) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if err := server.Shutdown(ctx); err != nil {
-		log.Fatal().Err(err).Msg("failed to gracefully shut down server")
+	err := server.Shutdown(ctx)
+	if err != nil {
+		logger.Error("Error occurred during shutdown", ErrAttr(err))
+		return
 	}
 }
 
@@ -69,4 +99,8 @@ func newServer(addr string, r *chi.Mux) *http.Server {
 		Addr:    addr,
 		Handler: r,
 	}
+}
+
+func ErrAttr(err error) slog.Attr {
+	return slog.Any("error", err)
 }
