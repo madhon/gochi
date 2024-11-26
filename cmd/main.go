@@ -68,7 +68,7 @@ func main() {
 
 	server := newServer(cfg.ServeAddress, router)
 
-	logger.Info("Server started....", cfg.ServeAddress)
+	logger.Info("Server started....", slog.String("address", cfg.ServeAddress))
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
