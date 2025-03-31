@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httplog/v2"
+	"golang.org/x/time/rate"
 
 	_ "chier/docs"
 	handler "chier/internal/http"
@@ -64,7 +65,8 @@ func main() {
 		httpSwagger.URL("/swagger/doc.json"),
 	))
 
-	handler.NewPingHandler(router)
+	limiter := rate.NewLimiter(rate.Every(12*time.Second), 5)
+	handler.NewPingHandler(router, limiter)
 
 	server := newServer(cfg.ServeAddress, router)
 
