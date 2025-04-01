@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"github.com/go-chi/httplog/v2"
 	"golang.org/x/time/rate"
 
@@ -47,9 +48,11 @@ func main() {
 		TimeFieldFormat:  time.RFC3339,
 		MessageFieldName: "message",
 	})
+
 	cfg, err := config.LoadAppConfig(".")
 	if err != nil {
 		logger.Error("unable to load configurations", ErrAttr(err))
+		os.Exit(1)
 	}
 
 	router := chi.NewRouter()
@@ -61,11 +64,22 @@ func main() {
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.Heartbeat("/healthz"))
 
+	router.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"*"}, // Adjust in production
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
+		AllowCredentials: true,
+		MaxAge:           300, // Maximum value not ignored by any of major browsers
+	}))
+
 	router.Get("/swagger/*", httpSwagger.Handler(
 		httpSwagger.URL("/swagger/doc.json"),
 	))
 
-	limiter := rate.NewLimiter(rate.Every(12*time.Second), 5)
+	limiter := rate.NewLimiter(
+		rate.Every(12*time.Second),
+		5)
+
 	handler.NewPingHandler(router, limiter)
 
 	server := newServer(cfg.ServeAddress, router)
@@ -75,31 +89,44 @@ func main() {
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("failed to start server", ErrAttr(err))
+			os.Exit(1)
 		}
 	}()
 
+	// Wait for shutdown signal
 	waitForShutdown(server)
+	logger.Info("Server stopped gracefully")
 }
 
 func waitForShutdown(server *http.Server) {
+	// Create channel for shutdown signals
 	sig := make(chan os.Signal, 1)
+	// Listen for interrupt and SIGTERM signals
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 	<-sig
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	logger.Info("Shutdown signal received, gracefully shutting down...")
+
+	// Create timeout context for shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	err := server.Shutdown(ctx)
-	if err != nil {
-		logger.Error("Error occurred during shutdown", ErrAttr(err))
-		return
+	// Attempt graceful shutdown
+	if err := server.Shutdown(ctx); err != nil {
+		logger.Error("Server shutdown failed", ErrAttr(err))
+		// Force shutdown
+		if err := server.Close(); err != nil {
+			logger.Error("Server forced close failed", ErrAttr(err))
+		}
 	}
 }
-
 func newServer(addr string, r *chi.Mux) *http.Server {
 	return &http.Server{
-		Addr:    addr,
-		Handler: r,
+		Addr:         addr,
+		Handler:      r,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 }
 
