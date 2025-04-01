@@ -30,7 +30,9 @@ func NewPingHandler(r *chi.Mux, l *rate.Limiter) {
 // @Summary  Ping the API
 // @Description Pings the API and gets response back
 // @Produce json
-// @Router       /ping [get]
+// @Router       /v1/ping [get]
+// @Success 200 {object} pingResponse
+// @Failure 429 {string} string "Rate limit exceeded"
 func (h *pingHandler) GetPing(w http.ResponseWriter, r *http.Request) {
 	oplog := httplog.LogEntry(r.Context())
 	oplog.Info("Ping Handler Called")

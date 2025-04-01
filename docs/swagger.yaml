@@ -1,4 +1,10 @@
 basePath: /v1
+definitions:
+  handler.pingResponse:
+    properties:
+      result:
+        type: string
+    type: object
 host: localhost:4343
 info:
   contact:
@@ -13,11 +19,19 @@ info:
   title: Swagger Example API
   version: "1.0"
 paths:
-  /ping:
+  /v1/ping:
     get:
       description: Pings the API and gets response back
       produces:
       - application/json
-      responses: {}
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.pingResponse'
+        "429":
+          description: Rate limit exceeded
+          schema:
+            type: string
       summary: Ping the API
 swagger: "2.0"

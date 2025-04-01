@@ -24,14 +24,37 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/ping": {
+        "/v1/ping": {
             "get": {
                 "description": "Pings the API and gets response back",
                 "produces": [
                     "application/json"
                 ],
                 "summary": "Ping the API",
-                "responses": {}
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handler.pingResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Rate limit exceeded",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "handler.pingResponse": {
+            "type": "object",
+            "properties": {
+                "result": {
+                    "type": "string"
+                }
             }
         }
     }
