@@ -9,7 +9,7 @@ require (
 	github.com/spf13/viper v1.20.1
 	github.com/swaggo/http-swagger/v2 v2.0.2
 	github.com/swaggo/swag v1.16.4
-	golang.org/x/time v0.11.0
+	golang.org/x/time v0.12.0
 )
 
 require (
