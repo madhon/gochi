@@ -2,12 +2,12 @@ package handler
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
-	"github.com/go-chi/httplog/v2"
-	"golang.org/x/time/rate"
-
 	"github.com/go-chi/chi/v5"
+
+	"golang.org/x/time/rate"
 )
 
 type pingResponse struct {
@@ -34,7 +34,7 @@ func NewPingHandler(r *chi.Mux, l *rate.Limiter) {
 // @Success 200 {object} pingResponse
 // @Failure 429 {string} string "Rate limit exceeded"
 func (h *pingHandler) GetPing(w http.ResponseWriter, r *http.Request) {
-	oplog := httplog.LogEntry(r.Context())
+	oplog := slog.Default()
 	oplog.Info("Ping Handler Called")
 
 	if h.limiter != nil && !h.limiter.Allow() {
@@ -48,7 +48,6 @@ func (h *pingHandler) GetPing(w http.ResponseWriter, r *http.Request) {
 	response := pingResponse{Result: "pong"}
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		oplog.Error("failed to encode response", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}

@@ -15,7 +15,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	"github.com/go-chi/httplog/v2"
+	"github.com/go-chi/httplog/v3"
 	"golang.org/x/time/rate"
 
 	_ "chier/docs"
@@ -38,16 +38,12 @@ import (
 
 // @Host localhost:4343
 // @BasePath /v1
-
-var logger httplog.Logger
+var logger slog.Logger
 
 func main() {
-	logger := httplog.NewLogger("Chi", httplog.Options{
-		Concise:          true,
-		RequestHeaders:   true,
-		TimeFieldFormat:  time.RFC3339,
-		MessageFieldName: "message",
-	})
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil)).With(
+		slog.String("app", "chier"),
+	)
 
 	cfg, err := config.LoadAppConfig(".")
 	if err != nil {
@@ -57,7 +53,7 @@ func main() {
 
 	router := chi.NewRouter()
 
-	router.Use(httplog.RequestLogger(logger))
+	router.Use(httplog.RequestLogger(logger, nil))
 	router.Use(middleware.Timeout(60 * time.Second))
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RealIP)
