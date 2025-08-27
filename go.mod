@@ -3,7 +3,7 @@ module chier
 go 1.24.6
 
 require (
-	github.com/go-chi/chi/v5 v5.2.2
+	github.com/go-chi/chi/v5 v5.2.3
 	github.com/go-chi/cors v1.2.2
 	github.com/go-chi/httplog/v3 v3.2.2
 	github.com/spf13/viper v1.20.1
