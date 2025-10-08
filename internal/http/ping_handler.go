@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"sync"
 
 	"github.com/go-chi/chi/v5"
 
@@ -15,11 +16,19 @@ type pingResponse struct {
 }
 
 type pingHandler struct {
-	limiter *rate.Limiter
+	limiter      *rate.Limiter
+	responsePool sync.Pool
 }
 
 func NewPingHandler(r *chi.Mux, l *rate.Limiter) {
-	handler := &pingHandler{limiter: l}
+	handler := &pingHandler{
+		limiter: l,
+		responsePool: sync.Pool{
+			New: func() interface{} {
+				return &pingResponse{}
+			},
+		},
+	}
 
 	r.Route("/v1", func(r chi.Router) {
 		r.Get("/ping", handler.GetPing)
@@ -45,7 +54,9 @@ func (h *pingHandler) GetPing(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	response := pingResponse{Result: "pong"}
+	response := h.responsePool.Get().(*pingResponse)
+	response.Result = "pong"
+	defer h.responsePool.Put(response)
 
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)

@@ -52,9 +52,10 @@ func main() {
 	}
 
 	router := chi.NewRouter()
-
+	router.Use(middleware.Compress(5, "gzip"))
 	router.Use(httplog.RequestLogger(logger, nil))
-	router.Use(middleware.Timeout(60 * time.Second))
+	router.Use(middleware.Timeout(30 * time.Second))
+	router.Use(middleware.RequestSize(1048576)) // 1MB limit
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RealIP)
 	router.Use(middleware.Recoverer)
@@ -64,8 +65,8 @@ func main() {
 		AllowedOrigins:   []string{"*"}, // Adjust in production
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
-		AllowCredentials: true,
-		MaxAge:           300, // Maximum value not ignored by any of major browsers
+		AllowCredentials: false, // Disable if not needed
+		MaxAge:           86400, // 24 hours
 	}))
 
 	router.Get("/swagger/*", httpSwagger.Handler(
@@ -118,11 +119,12 @@ func waitForShutdown(server *http.Server) {
 }
 func newServer(addr string, r *chi.Mux) *http.Server {
 	return &http.Server{
-		Addr:         addr,
-		Handler:      r,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		Addr:           addr,
+		Handler:        r,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		IdleTimeout:    120 * time.Second,
+		MaxHeaderBytes: 1 << 20, // 1 MB
 	}
 }
 
