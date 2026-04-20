@@ -1,11 +1,13 @@
+ARG GOVERSION=1.26.2
+
 # Step 1: Modules caching
-FROM --platform=$BUILDPLATFORM golang:1.25.5 AS modules
+FROM --platform=$BUILDPLATFORM golang:$GOVERSION AS modules
 COPY go.mod go.sum /modules/
 WORKDIR /modules
 RUN go mod download && go mod verify
 
 # Step 2: Builder
-FROM --platform=$BUILDPLATFORM golang:1.25.5 AS builder
+FROM --platform=$BUILDPLATFORM golang:$GOVERSION AS builder
 COPY --from=modules /go/pkg /go/pkg
 
 COPY . /app
