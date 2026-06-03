@@ -1,4 +1,4 @@
-ARG GOVERSION=1.26.3
+ARG GOVERSION=1.26.4
 
 # Step 1: Modules caching
 FROM --platform=$BUILDPLATFORM golang:$GOVERSION AS modules
