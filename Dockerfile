@@ -19,12 +19,12 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     -o /bin/app ./cmd/main.go
 
 # Step 2: Tzdata source
-FROM --platform=$BUILDPLATFORM debian:bookworm-slim AS tzdata
+FROM --platform=$BUILDPLATFORM debian:trixie-slim AS tzdata
 RUN apt-get update && apt-get install -y --no-install-recommends tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # Step 3: Final
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian13:nonroot-amd64
 COPY --from=tzdata /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 WORKDIR /app
