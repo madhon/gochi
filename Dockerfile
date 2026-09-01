@@ -1,4 +1,4 @@
-ARG GOVERSION=1.26.5
+ARG GOVERSION=1.27.0
 
 # Step 1: Builder
 FROM --platform=$BUILDPLATFORM golang:${GOVERSION} AS builder
