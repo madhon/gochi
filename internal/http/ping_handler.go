@@ -24,7 +24,7 @@ func NewPingHandler(r *chi.Mux, l *rate.Limiter) {
 	handler := &pingHandler{
 		limiter: l,
 		responsePool: sync.Pool{
-			New: func() interface{} {
+			New: func() any {
 				return &pingResponse{}
 			},
 		},

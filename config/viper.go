@@ -22,8 +22,7 @@ func LoadAppConfig(path string) (AppConfig, error) {
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {
-		var configFileNotFoundError viper.ConfigFileNotFoundError
-		if errors.As(err, &configFileNotFoundError) {
+		if _, ok := errors.AsType[viper.ConfigFileNotFoundError](err); ok {
 			return AppConfig{}, fmt.Errorf("config file not found: %s", path)
 		}
 		return AppConfig{}, fmt.Errorf("failed to read config file: %w", err)
