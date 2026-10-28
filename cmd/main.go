@@ -77,44 +77,48 @@ func main() {
 
 	handler.NewPingHandler(router, limiter)
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	server := newServer(cfg.ServeAddress, router)
 
 	logger.Info("Server started....", slog.String("address", cfg.ServeAddress))
 
+	serverErr := make(chan error, 1)
 	go func() {
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Error("failed to start server", ErrAttr(err))
-			os.Exit(1)
+			serverErr <- err
 		}
 	}()
 
-	// Wait for shutdown signal
-	waitForShutdown(server, logger)
+	if err := waitForShutdown(ctx, server, serverErr, logger); err != nil {
+		logger.Error("server stopped with error", ErrAttr(err))
+		stop()
+		os.Exit(1)
+	}
+
 	logger.Info("Server stopped gracefully")
 }
 
-func waitForShutdown(server *http.Server, logger *slog.Logger) {
-	// Create channel for shutdown signals
-	sig := make(chan os.Signal, 1)
-	// Listen for interrupt and SIGTERM signals
-	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-	<-sig
+func waitForShutdown(ctx context.Context, server *http.Server, serverErr <-chan error, logger *slog.Logger) error {
+	select {
+	case err := <-serverErr:
+		return err
+	case <-ctx.Done():
+	}
 
 	logger.Info("Shutdown signal received, gracefully shutting down...")
 
-	// Create timeout context for shutdown
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// Attempt graceful shutdown
-	if err := server.Shutdown(ctx); err != nil {
+	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Error("Server shutdown failed", ErrAttr(err))
-		// Force shutdown
-		if err := server.Close(); err != nil {
-			logger.Error("Server forced close failed", ErrAttr(err))
-		}
+		return errors.Join(err, server.Close())
 	}
+	return nil
 }
+
 func newServer(addr string, r *chi.Mux) *http.Server {
 	return &http.Server{
 		Addr:           addr,

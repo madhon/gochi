@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -58,8 +58,7 @@ func (h *pingHandler) GetPing(w http.ResponseWriter, r *http.Request) {
 	response.Result = "pong"
 	defer h.responsePool.Put(response)
 
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+	if err := json.MarshalWrite(w, response); err != nil {
+		slog.Error("failed to encode ping response", slog.Any("error", err))
 	}
 }
