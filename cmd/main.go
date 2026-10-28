@@ -38,8 +38,6 @@ import (
 
 // @Host localhost:4343
 // @BasePath /v1
-var logger slog.Logger
-
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil)).With(
 		slog.String("app", "chier"),
@@ -91,11 +89,11 @@ func main() {
 	}()
 
 	// Wait for shutdown signal
-	waitForShutdown(server)
+	waitForShutdown(server, logger)
 	logger.Info("Server stopped gracefully")
 }
 
-func waitForShutdown(server *http.Server) {
+func waitForShutdown(server *http.Server, logger *slog.Logger) {
 	// Create channel for shutdown signals
 	sig := make(chan os.Signal, 1)
 	// Listen for interrupt and SIGTERM signals
