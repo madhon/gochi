@@ -57,7 +57,7 @@ func main() {
 	router.Use(middleware.Timeout(30 * time.Second))
 	router.Use(middleware.RequestSize(1048576)) // 1MB limit
 	router.Use(middleware.RequestID)
-	router.Use(middleware.RealIP)
+	router.Use(middleware.ClientIPFromXFFTrustedProxies(cfg.TrustedProxyCount))
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.Heartbeat("/healthz"))
 

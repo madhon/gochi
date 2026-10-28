@@ -8,7 +8,8 @@ import (
 )
 
 type AppConfig struct {
-	ServeAddress string `mapstructure:"SERVE_ADDRESS"`
+	ServeAddress      string `mapstructure:"SERVE_ADDRESS"`
+	TrustedProxyCount int    `mapstructure:"TRUSTED_PROXY_COUNT"`
 }
 
 func LoadAppConfig(path string) (AppConfig, error) {
@@ -31,6 +32,10 @@ func LoadAppConfig(path string) (AppConfig, error) {
 	var config AppConfig
 	if err := viper.Unmarshal(&config); err != nil {
 		return AppConfig{}, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+
+	if config.TrustedProxyCount < 1 {
+		return AppConfig{}, fmt.Errorf("TRUSTED_PROXY_COUNT must be at least 1")
 	}
 
 	return config, nil
