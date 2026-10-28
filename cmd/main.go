@@ -16,10 +16,12 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/go-chi/httplog/v3"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/time/rate"
 
 	_ "chier/docs"
 	handler "chier/internal/http"
+	"chier/internal/observability"
 
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 )
@@ -49,9 +51,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	traceInitCtx, cancelTraceInit := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownTracing, err := observability.InitTracing(traceInitCtx)
+	cancelTraceInit()
+	if err != nil {
+		logger.Error("unable to initialize tracing", ErrAttr(err))
+		os.Exit(1)
+	}
+
 	router := chi.NewRouter()
 	router.Use(middleware.Compress(5, "gzip"))
 	router.Use(httplog.RequestLogger(logger, nil))
+	router.Use(handler.TraceRoute)
 	router.Use(middleware.Timeout(30 * time.Second))
 	router.Use(middleware.RequestSize(1048576)) // 1MB limit
 	router.Use(middleware.RequestID)
@@ -80,7 +91,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	server := newServer(cfg.ServeAddress, router)
+	server := newServer(cfg.ServeAddress, otelhttp.NewHandler(router, "chier"))
 
 	logger.Info("Server started....", slog.String("address", cfg.ServeAddress))
 
@@ -91,8 +102,16 @@ func main() {
 		}
 	}()
 
-	if err := waitForShutdown(ctx, server, serverErr, logger); err != nil {
-		logger.Error("server stopped with error", ErrAttr(err))
+	serverStopErr := waitForShutdown(ctx, server, serverErr, logger)
+
+	traceShutdownCtx, cancelTraceShutdown := context.WithTimeout(context.Background(), 10*time.Second)
+	if err := shutdownTracing(traceShutdownCtx); err != nil {
+		logger.Error("tracing shutdown failed", ErrAttr(err))
+	}
+	cancelTraceShutdown()
+
+	if serverStopErr != nil {
+		logger.Error("server stopped with error", ErrAttr(serverStopErr))
 		stop()
 		os.Exit(1)
 	}
@@ -119,10 +138,10 @@ func waitForShutdown(ctx context.Context, server *http.Server, serverErr <-chan 
 	return nil
 }
 
-func newServer(addr string, r *chi.Mux) *http.Server {
+func newServer(addr string, handler http.Handler) *http.Server {
 	return &http.Server{
 		Addr:           addr,
-		Handler:        r,
+		Handler:        handler,
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
 		IdleTimeout:    120 * time.Second,
